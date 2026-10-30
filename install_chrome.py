@@ -24,8 +24,10 @@ def main():
             package.extractall(ROOT)
         archive.unlink()
     chrome = ROOT / "chrome-linux64" / "chrome"
+    crashpad_handler = ROOT / "chrome-linux64" / "chrome_crashpad_handler"
     chromedriver = ROOT / "chromedriver-linux64" / "chromedriver"
     chrome.chmod(chrome.stat().st_mode | 0o111)
+    crashpad_handler.chmod(crashpad_handler.stat().st_mode | 0o111)
     chromedriver.chmod(chromedriver.stat().st_mode | 0o111)
     shutil.copy2(chromedriver, "/usr/local/bin/chromedriver")
     os.chmod("/usr/local/bin/chromedriver", 0o755)
