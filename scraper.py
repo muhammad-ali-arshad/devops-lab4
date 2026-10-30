@@ -1,5 +1,6 @@
 import json
 import os
+import urllib.request
 from urllib.parse import parse_qs, quote_plus, urlparse
 
 from bs4 import BeautifulSoup
@@ -41,9 +42,30 @@ def _driver():
     options.add_argument("--disable-gpu")
     options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36")
     options.binary_location = os.getenv("CHROME_BIN", "/usr/bin/google-chrome")
+    options.page_load_strategy = "eager"
     driver = webdriver.Chrome(service=Service(os.getenv("CHROMEDRIVER", "/usr/local/bin/chromedriver")), options=options)
     driver.set_page_load_timeout(25)
     return driver
+
+
+def _wp_search(keyword: str, source: NewsSource) -> tuple[str, int]:
+    search_url = f"https://propakistani.pk/wp-json/wp/v2/search?search={quote_plus(keyword)}&per_page=1"
+    request = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        results = json.load(response)
+    if not results or not _allowed(results[0].get("url", ""), source):
+        raise ScrapeError("No ProPakistani search result found")
+    return results[0]["url"], results[0]["id"]
+
+
+def _wp_article(post_id: int) -> str:
+    request = urllib.request.Request(
+        f"https://propakistani.pk/wp-json/wp/v2/posts/{post_id}",
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        post = json.load(response)
+    return _article_text(f"<article>{post['content']['rendered']}</article>")
 
 
 def _first_result(driver, source: NewsSource, keyword: str) -> str:
@@ -89,15 +111,27 @@ def _article_text(html: str) -> str:
 
 def fetch_first_article(source: NewsSource, keyword: str) -> tuple[str, str]:
     driver = None
+    url = None
+    post_id = None
     try:
+        if source.name == "ProPakistani":
+            try:
+                url, post_id = _wp_search(keyword, source)
+            except (OSError, ValueError, KeyError, TypeError, ScrapeError):
+                pass
         driver = _driver()
-        url = _first_result(driver, source, keyword)
+        url = url or _first_result(driver, source, keyword)
         driver.get(url)
         if not _allowed(driver.current_url, source):
             raise ScrapeError("Article redirected outside the assigned news source")
         WebDriverWait(driver, 12).until(lambda d: len(d.find_elements(By.TAG_NAME, "p")) >= 2)
         return driver.current_url, _article_text(driver.page_source)
-    except WebDriverException as exc:
+    except (WebDriverException, ScrapeError) as exc:
+        if post_id is not None and url is not None:
+            try:
+                return url, _wp_article(post_id)
+            except (OSError, ValueError, KeyError, TypeError, ScrapeError):
+                pass
         raise ScrapeError("Browser could not load the search result or article") from exc
     finally:
         if driver is not None:
