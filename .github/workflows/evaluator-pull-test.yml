@@ -1,0 +1,42 @@
+name: Verify published Docker Hub image
+
+on:
+  push:
+    paths:
+      - .github/workflows/evaluator-pull-test.yml
+  workflow_dispatch:
+
+jobs:
+  pull-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull public image and start it as the evaluator will
+        run: |
+          set -euo pipefail
+          docker pull ali024024/devops-lab4:fa23-bds-024
+          docker image inspect --format 'Pulled digest: {{index .RepoDigests 0}}; exposed ports: {{json .Config.ExposedPorts}}' ali024024/devops-lab4:fa23-bds-024
+          docker run -d --name lab4-pull-test -p 7000:7000 ali024024/devops-lab4:fa23-bds-024
+      - name: Verify Chrome, ChromeDriver, and Selenium run inside image
+        run: |
+          set -euo pipefail
+          docker exec lab4-pull-test /opt/chrome/chrome-linux64/chrome --version
+          docker exec lab4-pull-test /usr/local/bin/chromedriver --version
+          docker exec lab4-pull-test python -c 'from scraper import _driver; from selenium.webdriver.common.by import By; d=_driver(); d.get("data:text/html,<h1>Selenium works</h1>"); assert d.find_element(By.TAG_NAME,"h1").text == "Selenium works"; d.quit(); print("Selenium Chrome check passed")'
+      - name: Verify page and API contract for two keywords
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:7000/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:7000/ | grep -F 'FA23-BDS-024'
+          for keyword in technology pakistan; do
+            curl --fail --max-time 85 --silent --show-error --get --data-urlencode "keyword=$keyword" http://localhost:7000/get > response.json
+            python -c 'import json,sys,urllib.parse; x=json.load(open("response.json")); k=sys.argv[1]; assert set(x)=={"registration","newssource","keyword","url","summary"}; assert x["registration"]=="FA23-BDS-024"; assert x["newssource"]=="ProPakistani"; assert x["keyword"]==k; assert urllib.parse.urlparse(x["url"]).hostname in {"propakistani.pk","www.propakistani.pk"}; assert len(x["summary"])>80; print("PASS",k,x["url"],"summary_chars",len(x["summary"]))' "$keyword"
+          done
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs lab4-pull-test || true
+      - name: Remove test container
+        if: always()
+        run: docker rm -f lab4-pull-test || true
