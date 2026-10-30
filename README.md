@@ -36,6 +36,8 @@ docker login
 docker push ali024024/devops-lab4:fa23-bds-024
 ```
 
+Alternatively, add a Docker Hub access token as the GitHub Actions repository secret `DOCKERHUB_TOKEN`, then run the **Build and publish Docker image** workflow from the Actions tab. The workflow builds and pushes the same image tag without requiring Docker on your own computer. Do not commit the token or paste it into the submission form.
+
 Submission values:
 
 - Name: Muhmmad Ali Arshad

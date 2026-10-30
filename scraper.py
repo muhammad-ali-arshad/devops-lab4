@@ -1,3 +1,4 @@
+import json
 import os
 from urllib.parse import parse_qs, quote_plus, urlparse
 
@@ -46,6 +47,14 @@ def _driver():
 
 
 def _first_result(driver, source: NewsSource, keyword: str) -> str:
+    if source.name == "ProPakistani":
+        try:
+            driver.get(f"https://propakistani.pk/wp-json/wp/v2/search?search={quote_plus(keyword)}&per_page=1")
+            results = json.loads(driver.find_element(By.TAG_NAME, "body").text)
+            if results and _allowed(results[0]["url"], source):
+                return results[0]["url"]
+        except (WebDriverException, ValueError, KeyError, TypeError):
+            pass
     query = quote_plus(f"site:{source.domains[0]} {keyword}")
     engines = (
         (f"https://www.google.com/search?q={query}&num=10", "a:has(h3)"),
