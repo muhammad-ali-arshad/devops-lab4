@@ -21,6 +21,8 @@ jobs:
           set -euo pipefail
           docker exec lab4-pull-test /opt/chrome/chrome-linux64/chrome --version
           docker exec lab4-pull-test /usr/local/bin/chromedriver --version
+          docker exec lab4-pull-test sh -c "ldd /opt/chrome/chrome-linux64/chrome | grep 'not found' || true"
+          docker exec lab4-pull-test /opt/chrome/chrome-linux64/chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --dump-dom 'data:text/html,<h1>Chrome works</h1>'
           docker exec lab4-pull-test python -c 'from scraper import _driver; from selenium.webdriver.common.by import By; d=_driver(); d.get("data:text/html,<h1>Selenium works</h1>"); assert d.find_element(By.TAG_NAME,"h1").text == "Selenium works"; d.quit(); print("Selenium Chrome check passed")'
       - name: Verify page and API contract for two keywords
         run: |
