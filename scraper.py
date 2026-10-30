@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import urllib.request
 from urllib.parse import parse_qs, quote_plus, urlparse
 
@@ -68,6 +69,33 @@ def _wp_article(post_id: int) -> str:
     return _article_text(f"<article>{post['content']['rendered']}</article>")
 
 
+def _reader_content(url: str) -> str:
+    # Reader service can access an article when the news site blocks cloud IP ranges.
+    proxy_url = "https://r.jina.ai/" + url.replace("&", "%26")
+    request = urllib.request.Request(proxy_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=35) as response:
+        text = response.read().decode("utf-8", "replace")
+    if "Markdown Content:\n" not in text:
+        raise ScrapeError("Reader service returned no article content")
+    return text.split("Markdown Content:\n", 1)[1].strip()
+
+
+def _reader_search(keyword: str, source: NewsSource) -> str:
+    url = f"https://propakistani.pk/wp-json/wp/v2/search?search={quote_plus(keyword)}&per_page=1"
+    results = json.loads(_reader_content(url))
+    if not results or not _allowed(results[0].get("url", ""), source):
+        raise ScrapeError("No ProPakistani search result found")
+    return results[0]["url"]
+
+
+def _reader_article(url: str) -> str:
+    text = _reader_content(url)
+    text = re.sub(r"!?\[([^]]*)\]\([^)]+\)", r"\1", text)
+    if len(text) < 120:
+        raise ScrapeError("Reader service returned too little article text")
+    return text[:5000]
+
+
 def _first_result(driver, source: NewsSource, keyword: str) -> str:
     if source.name == "ProPakistani":
         try:
@@ -130,6 +158,12 @@ def fetch_first_article(source: NewsSource, keyword: str) -> tuple[str, str]:
         if post_id is not None and url is not None:
             try:
                 return url, _wp_article(post_id)
+            except (OSError, ValueError, KeyError, TypeError, ScrapeError):
+                pass
+        if source.name == "ProPakistani":
+            try:
+                url = url or _reader_search(keyword, source)
+                return url, _reader_article(url)
             except (OSError, ValueError, KeyError, TypeError, ScrapeError):
                 pass
         raise ScrapeError("Browser could not load the search result or article") from exc

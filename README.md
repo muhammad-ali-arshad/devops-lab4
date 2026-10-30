@@ -5,7 +5,7 @@ Registration: FA23-BDS-024
 Language: Python  
 Assigned source: ProPakistani (`024 % 20 + 1 = 5`)
 
-The container includes Python, Chrome for Testing, a matching ChromeDriver, Selenium, and a Flask REST API. Selenium searches the assigned news source for a keyword, loads the first result, extracts the article, and produces an extractive summary.
+The container includes Python, Chrome for Testing, a matching ChromeDriver, Selenium, and a Flask REST API. Selenium searches the assigned news source for a keyword, loads the first result, extracts the article, and produces an extractive summary. Because ProPakistani rejects some cloud IP addresses, the application falls back to its public WordPress API and then to the public Jina Reader service when direct browsing fails.
 
 ## Build and run
 
