@@ -24,6 +24,16 @@ curl 'http://localhost:7000/get?keyword=technology'
 
 The root page shows the registration number. `/get` returns JSON with `registration`, `newssource`, `keyword`, `url`, and `summary`. It returns HTTP 400 for a missing or oversized keyword and HTTP 502 if the search engine or article cannot be accessed. External sites can change their markup or block automation.
 
+## Optional AWS demo
+
+The lab EC2 instance is in `ap-south-1` (Mumbai). Its current public address, checked on 31 October 2026, is:
+
+```text
+http://35.154.114.110:7000/get?keyword=technology
+```
+
+The public IP can change when the instance is stopped and started. The Docker image does not depend on this address: anyone can run the image on their own machine with `-p 7000:7000` and use `http://localhost:7000/`.
+
 ## Publish
 
 ```bash
