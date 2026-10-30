@@ -1,0 +1,26 @@
+name: Container smoke test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t lab4-test .
+      - name: Start API
+        run: docker run -d --name lab4-test -p 7000:7000 lab4-test
+      - name: Check API and scrape
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:7000/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:7000/health | python -c 'import json,sys; assert json.load(sys.stdin)["registration"] == "FA23-BDS-024"'
+          curl --fail --max-time 90 -sS 'http://localhost:7000/get?keyword=technology' | python -c 'import json,sys; x=json.load(sys.stdin); assert set(x)=={"registration","newssource","keyword","url","summary"}; assert x["summary"]'
+      - name: Show logs on failure
+        if: failure()
+        run: docker logs lab4-test || true
